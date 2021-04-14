@@ -1,0 +1,77 @@
+# use TensorFlow version 1
+%tensorflow_version 1.x
+ 
+import tensorflow as tf
+ 
+# import MNIST dataset (handwritten digits)
+from tensorflow.examples.tutorials.mnist import input_data
+mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
+ 
+# a_0 is the input and y is the output
+a_0 = tf.placeholder(tf.float32, [None, 784])
+y = tf.placeholder(tf.float32, [None, 10])
+ 
+# random initialization of weights and bias using truncated normal distribution
+middle = 30     # 30 units in hidden layer
+w_1 = tf.Variable(tf.truncated_normal([784, middle]))
+b_1 = tf.Variable(tf.truncated_normal([1, middle]))
+w_2 = tf.Variable(tf.truncated_normal([middle, 10]))
+b_2 = tf.Variable(tf.truncated_normal([1, 10]))
+
+# define sigmoid function
+def sigmoid(x):
+    return tf.math.divide(tf.constant(1.0),
+                  tf.add(tf.constant(1.0), tf.exp(tf.negative(x))))
+ 
+# forward propagation
+z_1 = tf.add(tf.matmul(a_0, w_1), b_1)
+a_1 = sigmoid(z_1)
+z_2 = tf.add(tf.matmul(a_1, w_2), b_2)
+a_2 = sigmoid(z_2)
+ 
+# calculate error
+diff = tf.subtract(a_2, y)
+ 
+# define derivative of sigmoid function
+def sigmoidprime(x):
+    return tf.multiply(sigmoid(x), tf.subtract(tf.constant(1.0), sigmoid(x)))
+ 
+# backpropagation using product rule of differentiation
+d_z_2 = tf.multiply(diff, sigmoidprime(z_2))
+d_b_2 = d_z_2
+d_w_2 = tf.matmul(tf.transpose(a_1), d_z_2)
+ 
+d_a_1 = tf.matmul(d_z_2, tf.transpose(w_2))
+d_z_1 = tf.multiply(d_a_1, sigmoidprime(z_1))
+d_b_1 = d_z_1
+d_w_1 = tf.matmul(tf.transpose(a_0), d_z_1)
+ 
+# updating values of weights and bias
+eta = tf.constant(0.5)
+step = [tf.assign(w_1,tf.subtract(w_1, tf.multiply(eta, d_w_1))),
+        tf.assign(b_1,tf.subtract(b_1, tf.multiply(eta,tf.reduce_mean(d_b_1, axis=[0])))),
+        tf.assign(w_2,tf.subtract(w_2, tf.multiply(eta, d_w_2))), 
+        tf.assign(b_2,tf.subtract(b_2, tf.multiply(eta,tf.reduce_mean(d_b_2, axis=[0]))))]
+ 
+# check if output is equal to input
+acct_mat = tf.equal(tf.argmax(a_2, 1), tf.argmax(y, 1))
+acct_res = tf.reduce_sum(tf.cast(acct_mat, tf.float32))
+ 
+# define session
+sess = tf.InteractiveSession()
+sess.run(tf.global_variables_initializer())
+ 
+# divide dataset into 10 batches
+for i in range(10000):
+    batch_xs, batch_ys = mnist.train.next_batch(10)
+    sess.run(step, feed_dict = {a_0: batch_xs,
+                                y : batch_ys})
+    
+    # test the model after training using 1 batch
+    if i % 1000 == 0:
+        res = sess.run(acct_res, feed_dict =
+                       {a_0: mnist.test.images[:1000],
+                        y : mnist.test.labels[:1000]})
+	  print ("It identified", res ,"out of 1000 images correctly")
+ 
+sess.close()
